@@ -14,6 +14,28 @@ def create_question(question_text, days):
     time = timezone.now() + datetime.timedelta(days=days)
     return Question.objects.create(question_text=question_text, pub_date=time)
 
+class QuestionModelTests(TestCase):
+    def test_was_published_recently_with_future_question(self):
+        """
+        was_published_recently() returns False for questions whose pub_date is in the future.
+        """
+        future_question = create_question(question_text="Future question.", days=30)
+        self.assertIs(future_question.was_published_recently(), False)
+
+    def test_was_published_recently_with_old_question(self):
+        """
+        was_published_recently() returns False for questions whose pub_date is older than 1 day.
+        """
+        old_question = create_question(question_text="Old question.", days=-1)
+        self.assertIs(old_question.was_published_recently(), False)
+
+    def test_was_published_recently_with_recent_question(self):
+        """
+        was_published_recently() returns True for questions whose pub_date is within the last day.
+        """
+        recent_question = create_question(question_text="Recent question.", days=0)
+        self.assertIs(recent_question.was_published_recently(), True)
+
 class QuestionIndexViewTests(TestCase):
     def test_no_questions(self):
         """
@@ -71,25 +93,21 @@ class QuestionIndexViewTests(TestCase):
             [question2, question1],
         )
 
+class QuestionDetailViewTests(TestCase):
+    def test_future_question(self):
+        """
+        The detail view of a question with a pub_date in the future returns a 404 not found.
+        """
+        future_question = create_question(question_text="Future question.", days=5)
+        url = reverse("polls:detail", args=(future_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
-class QuestionModelTests(TestCase):
-    def test_was_published_recently_with_future_question(self):
+    def test_past_question(self):
         """
-        was_published_recently() returns False for questions whose pub_date is in the future.
+        The detail view of a question with a pub_date in the past displays the question's text.
         """
-        future_question = create_question(question_text="Future question.", days=30)
-        self.assertIs(future_question.was_published_recently(), False)
-
-    def test_was_published_recently_with_old_question(self):
-        """
-        was_published_recently() returns False for questions whose pub_date is older than 1 day.
-        """
-        old_question = create_question(question_text="Old question.", days=-1)
-        self.assertIs(old_question.was_published_recently(), False)
-
-    def test_was_published_recently_with_recent_question(self):
-        """
-        was_published_recently() returns True for questions whose pub_date is within the last day.
-        """
-        recent_question = create_question(question_text="Recent question.", days=0)
-        self.assertIs(recent_question.was_published_recently(), True)
+        past_question = create_question(question_text="Past question.", days=-5)
+        url = reverse("polls:detail", args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, past_question.question_text)
